@@ -1,0 +1,53 @@
+//@version=6
+//@author=Yooooounglee
+
+
+//note:20250505 home
+//1. Appel的MACD指标，他的交易理解是：市场的交易是脉冲式的，缩减的脉冲暗示调整近在眼前，而扩张的脉冲暗示市场即将继续上涨。
+//2. 他类比高尔夫球的运动，抛物线轨迹，从飞行的角度和速度判断落点，而球在上升过程中速度逐步减少，斜率逐渐归零，然后开始下降。
+//3. 综合，他关注的是动量的变化，是一个短期的趋势指标，缺少对长期和总体的把握。
+//4. MACD是一个双均线系统，所以理论上可以追踪长期走势，但他本人没有用这个的描述长期变化的想法。
+//5. 只是推断，Appel设计指标的初衷，可能只是为了提早的发现金叉和死叉。
+//6. 都市传说，其中的参数MACD(12,26,9)美国一周六天班，交易六天，12是两周，26是一个月只放四天假，鉴定为假。Appel自己的说法是，纯交易经验。拍脑袋来的。
+//7.1Appel给了一个建议，“长均线是短均线的2-3倍较好”，短期线的时间跨度越短，则越容易捕捉到短期的价格变化，但是也会增加噪声。
+//7.2信号线DEA的参数建议设置到3-9，他是MACD的移动指数平均线。
+//8. 他给了三组建议的参数，分别是(12,26,9)，(5,13,9)，(19,39,9)，其中第一个是最常用的，第二个是短线交易者的选择，第三个是中线交易者的选择。
+
+
+// 定义指标
+indicator("MACD", shorttitle="MACD", overlay=false)
+// 传输参数
+fastLength = input.int(12, title="Fast Length")
+slowLength = input.int(26, title="Slow Length")
+signalSmoothing = input.int(9, title="Signal Smoothing")
+src = input.source(close, title="Source")
+
+// 在图表中显示参数名称和对应的值
+// Precompute string representations of parameters
+fastLengthStr = str.tostring(fastLength)
+slowLengthStr = str.tostring(slowLength)
+signalSmoothingStr = str.tostring(signalSmoothing)
+srcStr = str.tostring(src)
+
+// Use precomputed strings in label.new
+label.new(bar_index, na, text=labelText, 
+    style=label.style_none, color=color.new(color.gray, 80), textcolor=color.white)
+    "\nSignal Smoothing: " + signalSmoothingStr + 
+    "\nSource: " + srcStr, 
+    style=label.style_none, color=color.new(color.white, 90), textcolor=color.black)
+labelText = fastLengthText + "\n" + slowLengthText + "\n" + signalSmoothingText + "\n" + sourceText
+
+label.new(bar_index, na, text=labelText, 
+    style=label.style_none, color=color.new(color.white, 90), textcolor=color.black)
+
+// MACD 计算过程
+fastMA = ta.ema(src, fastLength)
+slowMA = ta.ema(src, slowLength)
+macd = fastMA - slowMA
+signal = ta.ema(macd, signalSmoothing)
+histogram = macd - signal
+
+// 绘图
+plot(macd, color=color.blue, title="MACD线", linewidth=2)
+plot(signal, color=color.orange, title="Signal线", linewidth=2)
+plot(histogram, color=histogram >= 0 ? color.red : color.green, style=plot.style_histogram, title="直方图")

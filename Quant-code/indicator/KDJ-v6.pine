@@ -1,0 +1,40 @@
+//@version=6
+indicator("KDJ指标", overlay=false)  // 定义指标名称为“KDJ Indicator”，不覆盖在价格图表上
+
+// Input parameters
+length = input.int(9, title="KDJ Length")  // 输入参数：KDJ的周期长度
+smoothK = input.int(3, title="K Smoothing")  // 输入参数：K值的平滑周期
+smoothD = input.int(3, title="D Smoothing")  // 输入参数：D值的平滑周期
+
+// Calculate RSV
+highestHigh = ta.highest(high, length)  // 计算指定周期内的最高价
+lowestLow = ta.lowest(low, length)  // 计算指定周期内的最低价
+rsv = (close - lowestLow) / (highestHigh - lowestLow) * 100  // 计算RSV（未成熟随机值）
+
+// Calculate K, D, and J
+k = ta.sma(rsv, smoothK)  // 计算K值，使用RSV的简单移动平均
+d = ta.sma(k, smoothD)  // 计算D值，使用K值的简单移动平均
+j = 3 * k - 2 * d  // 计算J值，J值为K值的三倍减去D值的两倍
+
+// Plot K, D, and J
+plot(k, color=color.blue, title="K")  // 绘制K值，颜色为蓝色
+plot(d, color=color.orange, title="D")  // 绘制D值，颜色为橙色
+plot(j, color=color.white, title="J")  // 绘制J值，颜色为白色
+
+// Add overbought and oversold levels
+hline(80, "Overbought", color=color.red, linestyle=hline.style_dotted)  // 添加超买水平线，值为80，颜色为红色，虚线样式
+hline(20, "Oversold", color=color.green, linestyle=hline.style_dotted)  // 添加超卖水平线，值为20，颜色为绿色，虚线样式
+
+// Calculate cross signals
+crossBuy = ta.crossover(k - d, 0)  // 判断K-D从小于0到大于0的交叉（买入信号）
+crossSell = ta.crossunder(k - d, 0)  // 判断K-D从大于0到小于0的交叉（卖出信号）
+
+// Plot buy and sell signals on the price chart
+plotshape(crossBuy, style=shape.labelup, location=location.belowbar, color=color.red, text="多", title="提示做多信号")  // 绘制买入信号
+plotshape(crossSell, style=shape.labeldown, location=location.abovebar, color=color.green, text="空", title="提示做空信号")  // 绘制卖出信号
+
+// Detect bearish divergence (顶背离)
+bearishDivergence = ta.highest(close, length) > ta.highest(close[1], length) and ta.highest(j, length) <= ta.highest(j[1], length)
+
+// Plot bearish divergence signal
+plotshape(bearishDivergence, style=shape.triangledown, location=location.abovebar, color=color.green, text="↓", title="顶背离信号")
