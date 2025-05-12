@@ -1,36 +1,35 @@
 # clever-meme
 
-#### Description
-量化交易脚本
+## Introduction
+Quantitative trading scripts
 
-#### Software Architecture
-Software architecture description
+## Chapters
+### 1. Indicators
+#### 1.1 MACD
+#### 1.2 RSI
+Detailed information about the RSI indicator (Relative Strength Index), including calculation methods, derived indicators, application scenarios, advantages and disadvantages [RSI](Quant-code/indicator/RSI.md).
+#### 1.3 KDJ
+### 2. Strategies
+#### 2.1 
 
-#### Installation
+## Usage Instructions
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1. xxxx
+2. xxxx
+3. xxxx
 
-#### Instructions
+## Contributing
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1. Fork this repository
+2. Create a new Feat_xxx branch
+3. Submit your code
+4. Create a Pull Request
 
-#### Contribution
+## Features
 
-1.  Fork the repository
-2.  Create Feat_xxx branch
-3.  Commit your code
-4.  Create Pull Request
-
-
-#### Gitee Feature
-
-1.  You can use Readme\_XXX.md to support different languages, such as Readme\_en.md, Readme\_zh.md
-2.  Gitee blog [blog.gitee.com](https://blog.gitee.com)
-3.  Explore open source project [https://gitee.com/explore](https://gitee.com/explore)
-4.  The most valuable open source project [GVP](https://gitee.com/gvp)
-5.  The manual of Gitee [https://gitee.com/help](https://gitee.com/help)
-6.  The most popular members  [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+1. Use Readme_XXX.md to support different languages, e.g. Readme_en.md, Readme_zh.md
+2. Gitee official blog [blog.gitee.com](https://blog.gitee.com)
+3. Explore excellent open source projects on Gitee at [https://gitee.com/explore](https://gitee.com/explore)
+4. [GVP](https://gitee.com/gvp) stands for Gitee Most Valuable Project, which are outstanding open source projects selected through comprehensive evaluation
+5. Gitee official user manual [https://gitee.com/help](https://gitee.com/help)
+6. Gitee Cover Stars is a column showcasing Gitee members [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)

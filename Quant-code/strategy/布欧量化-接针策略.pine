@@ -37,7 +37,3 @@ if strategy.opentrades > 0  // 若未平仓交易数量大于0
     strategy.exit("抽离", "接针", limit = takeProfitPrice,stop = stopLossPrice ,comment = "抽离")
 
 // 注意：本策略未包含退出的条件，实际应用中，还需要添加额外的止盈和止损条件
-
-// 实际应用 
-// 20250504 01:00:00 Trump-usdc.p 短期暴跌，此策略在回测时，在45分钟以内的时间点表现良好，在1小时K线上造成巨额亏损，这是由于最后一笔交易迟迟未卖出导致的，
-// 经测试，在tradingview上设置手续费不为零时，导致了这种问题，修正：将计算止盈止损价格时，使用的strategy.opentrades.entry_price(0)替换为strategy.position_avg_price

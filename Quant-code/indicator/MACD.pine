@@ -22,32 +22,15 @@ slowLength = input.int(26, title="Slow Length")
 signalSmoothing = input.int(9, title="Signal Smoothing")
 src = input.source(close, title="Source")
 
-// 在图表中显示参数名称和对应的值
-// Precompute string representations of parameters
-fastLengthStr = str.tostring(fastLength)
-slowLengthStr = str.tostring(slowLength)
-signalSmoothingStr = str.tostring(signalSmoothing)
-srcStr = str.tostring(src)
-
-// Use precomputed strings in label.new
-label.new(bar_index, na, text=labelText, 
-    style=label.style_none, color=color.new(color.gray, 80), textcolor=color.white)
-    "\nSignal Smoothing: " + signalSmoothingStr + 
-    "\nSource: " + srcStr, 
-    style=label.style_none, color=color.new(color.white, 90), textcolor=color.black)
-labelText = fastLengthText + "\n" + slowLengthText + "\n" + signalSmoothingText + "\n" + sourceText
-
-label.new(bar_index, na, text=labelText, 
-    style=label.style_none, color=color.new(color.white, 90), textcolor=color.black)
-
 // MACD 计算过程
 fastMA = ta.ema(src, fastLength)
 slowMA = ta.ema(src, slowLength)
-macd = fastMA - slowMA
-signal = ta.ema(macd, signalSmoothing)
-histogram = macd - signal
+DIF = fastMA - slowMA
+// DEM线，也叫信号线，是DIF的移动指数平均线，用于平滑DIF线，使DIF线更平滑，便于观察
+DEM = ta.ema(DIF, signalSmoothing)
+MACD = DIF - DEM
 
 // 绘图
-plot(macd, color=color.blue, title="MACD线", linewidth=2)
-plot(signal, color=color.orange, title="Signal线", linewidth=2)
-plot(histogram, color=histogram >= 0 ? color.red : color.green, style=plot.style_histogram, title="直方图")
+plot(DIF, color=color.white, title="DIF线", linewidth=2)
+plot(DEM, color=color.yellow, title="DEM线", linewidth=2)
+plot(MACD, color=MACD >= 0 ? color.red : color.green, style=plot.style_histogram, title="MACD柱状图", linewidth=2)
