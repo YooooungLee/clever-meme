@@ -1,0 +1,154 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ChartPrime
+
+//@version=6
+indicator("Parabolic RSI [ChartPrime]", overlay = false)
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 用户输入部分
+// --------------------------------------------------------------------------------------------------------------------{
+
+// RSI 参数设置
+len = input.int(14, "RSI Length", group = "RSI")  // RSI 的计算周期长度
+
+// RSI 阈值设置
+upper_ = input.int(70, "Threshold: ⭱", inline = "Threshold")  // RSI 上限阈值
+lower_ = input.int(30, " ⤓", inline = "Threshold")           // RSI 下限阈值
+
+// SAR 参数设置
+display_sar = input.bool(true, "SAR", group = "SAR")          // 是否显示 SAR
+start       = input.float(0.02, "Start", step = 0.01, inline = "sar", group = "SAR")  // SAR 初始加速因子
+inc         = input.float(0.02, "Increment", step = 0.01, inline = "sar", group = "SAR")  // SAR 加速因子增量
+max         = input.float(0.2, "Maximum", step = 0.01, inline = "sar", group = "SAR")  // SAR 最大加速因子
+color_up    = input.color(#EEA47F, "", inline = "c")          // SAR 上升趋势颜色
+color_dn    = input.color(#00539C, "", inline = "c")          // SAR 下降趋势颜色
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 指标计算部分
+// --------------------------------------------------------------------------------------------------------------------{
+
+// 计算 RSI 值
+rsi = ta.rsi(close, len)
+
+// 自定义 SAR 函数
+pine_sar(src, start, inc, max) =>
+
+    src_high = src+1
+    src_low  = src-1
+
+    var float result = na
+    var float maxMin = na
+    var float acceleration = na
+    var bool isBelow = false
+    bool isFirstTrendBar = false
+    
+    if bar_index <= len+2
+        if src > src[1]
+            isBelow := true
+            maxMin := src_high
+            result := src_low[1]
+        else
+            isBelow := false
+            maxMin := src_low
+            result := src_high[1]
+            
+        isFirstTrendBar := true
+        acceleration := start
+    
+    result := result + acceleration * (maxMin - result)
+    
+    if isBelow
+        if result > src_low
+            isFirstTrendBar := true
+            isBelow := false
+            result := math.max(src_high, maxMin)
+            maxMin := src_low
+            acceleration := start
+    else
+        if result < src_high
+            isFirstTrendBar := true
+            isBelow := true
+            result := math.min(src_low, maxMin)
+            maxMin := src_high
+            acceleration := start
+            
+    if not isFirstTrendBar
+        if isBelow
+            if src_high > maxMin
+                maxMin := src_high
+                acceleration := math.min(acceleration + inc, max)
+        else
+            if src_low < maxMin
+                maxMin := src_low
+                acceleration := math.min(acceleration + inc, max)
+    
+    if isBelow
+        result := math.min(result, src_low[1])
+        if bar_index > 1
+            result := math.min(result, src_low[2])
+        
+    else
+        result := math.max(result, src_high[1])
+        if bar_index > 1
+            result := math.max(result, src_high[2])
+    
+    [result, isBelow]
+
+// 计算 RSI 的 SAR 值
+[sar_rsi, isBelow] = pine_sar(rsi, start, inc, max)
+
+// 信号计算
+sig_up = isBelow != isBelow[1] and isBelow and barstate.isconfirmed  // 上升信号
+sig_dn = isBelow != isBelow[1] and not isBelow and barstate.isconfirmed  // 下降信号
+
+// 强信号计算
+s_sig_up = isBelow != isBelow[1] and isBelow and barstate.isconfirmed and sar_rsi <= lower_  // 强上升信号
+s_sig_dn = isBelow != isBelow[1] and not isBelow and barstate.isconfirmed and sar_rsi >= upper_  // 强下降信号
+
+var sar = float(na)
+
+// 是否显示 SAR
+if display_sar
+    sar := isBelow != isBelow[1] ? na : sar_rsi
+
+sar_col = isBelow ? color_up : color_dn  // SAR 颜色设置
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 可视化部分
+// --------------------------------------------------------------------------------------------------------------------{
+
+// 绘制 RSI 线
+rsiPlot = plot(rsi, "RSI", color=chart.fg_color)
+
+// 绘制 RSI 上下限水平线
+rsiUpperBand = hline(upper_, "RSI Upper Band", color=#787B86)
+midline = hline(50, "RSI Middle Band", color=color.new(#787B86, 50))
+rsiLowerBand = hline(lower_, "RSI Lower Band", color=#787B86)
+
+// 填充 RSI 背景
+fill(rsiUpperBand, rsiLowerBand, color=#c292571a, title="RSI Background Fill")
+
+// 绘制中线填充
+midLinePlot = plot(50, color = na, editable = false, display = display.none)
+fill(rsiPlot, midLinePlot, 100, 70, top_color = color.new(color.red, 0), bottom_color = color.new(color.orange, 100),  title = "Overbought Gradient Fill")
+fill(rsiPlot, midLinePlot, 30,  0,  top_color = color.new(color.red, 100), bottom_color = color.new(color.orange, 0),      title = "Oversold Gradient Fill")
+
+// 绘制 SAR 点
+sar_p = plot(sar, "SAR", color = sar_col, style = plot.style_circles)
+
+// 绘制信号形状
+plotshape(sig_up and sar_rsi >= lower_ ? sar_rsi : na, "Rsi Up", shape.diamond, location.absolute, size = size.tiny, color = sar_col)
+plotshape(sig_dn and sar_rsi <= upper_  ? sar_rsi : na, "Rsi Dn", shape.diamond, location.absolute, size = size.tiny, color = sar_col)
+
+// 绘制强信号形状
+plotchar(s_sig_up ? sar_rsi : na, "Rsi Up", "◈", location.absolute, size = size.tiny, color = sar_col)
+plotchar(s_sig_dn ? sar_rsi : na, "Rsi Dn", "◈", location.absolute, size = size.tiny, color = sar_col)
+
+// 绘制图表上的强信号形状
+plotshape(s_sig_up, "Chart Strong Rsi Up", shape.diamond, location.belowbar, size = size.small, color = sar_col, force_overlay = true)
+plotshape(s_sig_dn, "Chart Strong Rsi Dn", shape.diamond, location.abovebar, size = size.small, color = sar_col, force_overlay = true)
+
+// 绘制图表上的普通信号形状
+plotshape(sig_up and sar_rsi >= lower_, "Chart Rsi Up", shape.diamond, location.belowbar, size = size.tiny, color = sar_col, force_overlay = true)
+plotshape(sig_dn and sar_rsi <= upper_, "Chart Rsi Dn", shape.diamond, location.abovebar, size = size.tiny, color = sar_col, force_overlay = true)
+// --------------------------------------------------------------------------------------------------------------------}
