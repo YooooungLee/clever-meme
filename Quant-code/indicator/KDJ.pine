@@ -12,9 +12,9 @@ lowestLow = ta.lowest(low, length)  // 计算指定周期内的最低价
 rsv = (close - lowestLow) / (highestHigh - lowestLow) * 100  // 计算RSV（未成熟随机值）
 
 // Calculate K, D, and J
-k = ta.sma(rsv, smoothK)  // 计算K值，使用RSV的简单移动平均
-d = ta.sma(k, smoothD)  // 计算D值，使用K值的简单移动平均
-j = 3 * k - 2 * d  // 计算J值，J值为K值的三倍减去D值的两倍
+k = ta.ema(rsv, smoothK)  // 计算K值，使用RSV的指数移动平均
+d = ta.ema(k, smoothD)  // 计算D值，使用K值的指数移动平均
+j = 3 * d - 2 * k  // 计算J值，J值为k值的三倍减去d值的两倍
 
 // Plot K, D, and J
 plot(k, color=color.blue, title="K")  // 绘制K值，颜色为蓝色
