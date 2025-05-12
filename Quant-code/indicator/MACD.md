@@ -43,9 +43,11 @@ $$OSC = DIF - DEM = DIF - MACD，或简写为D-M$$
 -   DEM是DIF的移动平均线，n是计算DEM的周期数。通常n取9。
 -   OSC是MACD指标的差值，即DIFF和DEM的差值。
 
-<font color = '#F70'>故MACD指标是由两线一柱组合起来形成，快速线（白色线）为DIF，慢速线【信号线】（黄色线）为DEM，柱状图为MACD。</font>
+<font color = '#FF7070'>故MACD指标是由两线一柱组合起来形成，快速线（白色线）为DIF，慢速线【信号线】（黄色线）为DEM，柱状图为MACD。</font>
 
-想理解MACD指标，首先得明白移动平均值计算EMA()的用途。EMA()来源于MA，即移动平均，统计学毕业的人有印象，moving average。加上一个E(exponential)，也就是敲代码的时候计算指数的exp，引入指数的作用在于让越近期的数据加权影响力越重，但比较旧的数据也給予一定的加权值。
+实现过程的源代码详见 [MACD](MACD.pine)。
+
+想理解MACD指标，首先得明白移动平均值计算EMA()的用途。EMA()来源于MA，即移动平均，统计学毕业的人有印象，moving average。加上一个E(exponential)，也就是敲代码的时候计算指数的exp，引入指数的作ß用在于让越近期的数据加权影响力越重，但比较旧的数据也給予一定的加权值。
 
 加权的程度以排名 α 决定，α 数值介乎 0 至 1。α 也可用天数N来代表：
 $$\alpha = \frac{2}{N+1}$$
