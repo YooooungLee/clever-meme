@@ -19,7 +19,10 @@ EMA的计算公式如下：
 
 $$EMA = (Close - EMA(Close, n-1)) * 2 / (n + 1) + EMA(Close, n-1)$$
 
+RSI的计算公式如下：
 $$RSI = 100 - (100 / (1 + RS))$$
+
+RSI的源代码详见 [RSI](RSI.pine)。
 
 ## RSI的应用
 
