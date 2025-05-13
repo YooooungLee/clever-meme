@@ -6,8 +6,10 @@
 strategy("youtube布欧量化策略-接针策略", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
 
 // 定义下影线与实体的比较条件
-pinBarThreshold = input.float(1, title = "针的比例", minval = 0.01, step = 0.1)
-tp = input.float(1.02, title = "止盈比例", minval = 0.01, step = 0.01)
+pinBarThreshold = input.float(100, title = "针占箱体的比例(%)", minval = 0.01, step = 0.1)
+downRate = input.float(1, title = "下跌幅度(%)", minval = 0.01, step = 0.01)
+tp = input.float(102, title = "止盈比例(%)", minval = 0.01, step = 0.01)
+sp = input.float(95, title = "止损比例(%)", minval = 0.01, step = 0.01)
 
 // 计算实体和下影线的高度
 bodysize = math.abs(close - open)
@@ -15,13 +17,13 @@ lowerwicksize = low - math.min(open, close)
 lowerwicksizeabs = math.abs(lowerwicksize)
 
 // 判断是否为接针 (下影线大于实体部分的比例x) boolean类型
-w1 = lowerwicksizeabs > bodysize * pinBarThreshold
+w1 = lowerwicksizeabs > bodysize * pinBarThreshold / 100
 
-// 计算涨跌幅 ta.roc(close, 1) 表示当前收盘价与前一根k线收盘价之间的百分比变化（即涨跌幅）
+// 计算涨跌幅 ta.roc(close, 1) 表示当前收盘价与前一根k线收盘价之间的百分比变化（即涨跌幅），d是百分比值
 d = ta.roc(close, 1)
-// 跌幅超过1，True 【也可以设置为其他值】
-// 检查价格跌幅是否超过1%，表明出现显著的看跌走势
-w2 = d < -1
+
+// 跌幅超过downRate，True 【也可以设置为其他值】
+w2 = d < -1 * downRate
 
 // --------策略----------
 if w1 and w2  //w1 影线大于实体部分 and w2 跌幅超过1
@@ -30,9 +32,9 @@ if w1 and w2  //w1 影线大于实体部分 and w2 跌幅超过1
 
 if strategy.opentrades > 0  // 若未平仓交易数量大于0
     // 计算止盈价格：开仓价格乘以止盈比例，考虑到手续费影响，使用position_avg_price
-    takeProfitPrice = strategy.position_avg_price * tp
+    takeProfitPrice = strategy.position_avg_price * tp / 100
     // 计算止损价格：开仓价格乘以止损比例（这里为95%），考虑到手续费影响，使用position_avg_price
-    stopLossPrice = strategy.position_avg_price * 0.95
+    stopLossPrice = strategy.position_avg_price * sp / 100
     // 设置止盈条件
     strategy.exit("抽离", "接针", limit = takeProfitPrice,stop = stopLossPrice ,comment = "抽离")
 

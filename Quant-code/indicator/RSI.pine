@@ -9,8 +9,8 @@ indicator("RSI", shorttitle="RSI", overlay=false)
 len = input.int(14, "RSI Length", group = "RSI")  // RSI 的计算周期长度
 
 // RSI 阈值设置
-upper_ = input.int(70, "Threshold: ⭱", inline = "Threshold")  // RSI 上限阈值
-lower_ = input.int(30, " ⤓", inline = "Threshold")           // RSI 下限阈值
+upper_ = input.int(70, "RSI 上限阈值", inline = "RSI 上限阈值")  // RSI 上限阈值
+lower_ = input.int(30, " RSI 下限阈值", inline = "Threshold")           // RSI 下限阈值
 
 
 // 计算 RSI 值
@@ -32,3 +32,8 @@ rsiLowerBand = hline(lower_, "RSI Lower Band", color=#787B86)
 // 填充 RSI 背景
 fill(rsiUpperBand, rsiLowerBand, color=#c292571a, title="RSI Background Fill")
 
+// 当RSI穿过上下限时，分别加入气泡标签提示超买和超卖
+if rsi > upper_ and rsi[1] <= upper_
+    label.new(bar_index, upper_, "超买", style = label.style_label_down, color = color.red)
+if rsi < lower_ and rsi[1] >= lower_
+    label.new(bar_index, lower_, "超卖", style = label.style_label_up, color = color.green)

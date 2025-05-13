@@ -130,8 +130,8 @@ fill(rsiUpperBand, rsiLowerBand, color=#c292571a, title="RSI Background Fill")
 
 // 绘制中线填充
 midLinePlot = plot(50, color = na, editable = false, display = display.none)
-fill(rsiPlot, midLinePlot, 100, 70, top_color = color.new(color.red, 0), bottom_color = color.new(color.orange, 100),  title = "Overbought Gradient Fill")
-fill(rsiPlot, midLinePlot, 30,  0,  top_color = color.new(color.red, 100), bottom_color = color.new(color.orange, 0),      title = "Oversold Gradient Fill")
+fill(rsiPlot, midLinePlot, top_value = 100, bottom_value = 70, top_color = color.new(color.red, 0), bottom_color = color.new(color.orange, 100), title = "Overbought Gradient Fill")
+fill(rsiPlot, midLinePlot, top_value = 30, bottom_value = 0,  top_color = color.new(color.red, 100), bottom_color = color.new(color.orange, 0), title = "Oversold Gradient Fill")
 
 // 绘制 SAR 点
 sar_p = plot(sar, "SAR", color = sar_col, style = plot.style_circles)
@@ -144,11 +144,11 @@ plotshape(sig_dn and sar_rsi <= upper_  ? sar_rsi : na, "Rsi Dn", shape.diamond,
 plotchar(s_sig_up ? sar_rsi : na, "Rsi Up", "◈", location.absolute, size = size.tiny, color = sar_col)
 plotchar(s_sig_dn ? sar_rsi : na, "Rsi Dn", "◈", location.absolute, size = size.tiny, color = sar_col)
 
-// 绘制图表上的强信号形状
+// 在K线图绘制图表上的强信号形状
 plotshape(s_sig_up, "Chart Strong Rsi Up", shape.diamond, location.belowbar, size = size.small, color = sar_col, force_overlay = true)
 plotshape(s_sig_dn, "Chart Strong Rsi Dn", shape.diamond, location.abovebar, size = size.small, color = sar_col, force_overlay = true)
 
-// 绘制图表上的普通信号形状
+// 在K线图绘制图表上的普通信号形状
 plotshape(sig_up and sar_rsi >= lower_, "Chart Rsi Up", shape.diamond, location.belowbar, size = size.tiny, color = sar_col, force_overlay = true)
 plotshape(sig_dn and sar_rsi <= upper_, "Chart Rsi Dn", shape.diamond, location.abovebar, size = size.tiny, color = sar_col, force_overlay = true)
 // --------------------------------------------------------------------------------------------------------------------}
