@@ -1,0 +1,39 @@
+//@version=6
+strategy("动量策略-连续开单", overlay=true, fill_orders_on_standard_ohlc=true)
+
+// 参数
+fast_period = input(defval = 10, title="快速指数移动平均线周期")
+slow_period = input(20, title="慢速指数移动平均线周期")
+momentum_period = input(10, title="动量周期")
+long_stop_loss = input(0.05, title="多单止损比例")
+long_take_profit = input(0.1, title="多单止盈比例")
+short_stop_loss = input(0.05, title="空单止损比例")
+short_take_profit = input(0.1, title="空单止盈比例")
+
+// 指标
+fast_ma = ta.ema(close, fast_period)
+slow_ma = ta.ema(close, slow_period)
+momentum = close - close[momentum_period]
+
+// 多头信号
+is_bullish_signal = fast_ma > slow_ma and momentum > 0
+is_bullish_end = fast_ma < slow_ma or momentum <= 0
+
+// 空头信号
+is_bearish_signal = fast_ma < slow_ma and momentum < 0
+is_bearish_end = fast_ma > slow_ma or momentum >= 0
+// 多头开单（允许连续开单）
+if is_bullish_signal
+    strategy.entry("Buy", strategy.long, comment='开多@' + str.tostring(close))
+
+// 多头趋势结束时一次性平仓（平掉所有多单）
+if is_bullish_end
+    strategy.close("Buy", comment="多单集中平仓")
+
+// 空头开单
+if is_bearish_signal
+    strategy.entry("Sell", strategy.short, comment='开空@' + str.tostring(close))
+
+// 空头趋势结束时一次性平仓
+if is_bearish_end
+    strategy.close("Sell", comment="空单集中平仓")
