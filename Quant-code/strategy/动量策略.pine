@@ -11,17 +11,17 @@ short_stop_loss = input(0.05, title="空单止损比例")
 short_take_profit = input(0.1, title="空单止盈比例")
 
 // 指标
-fast_ma = ta.ema(close, fast_period)
-slow_ma = ta.ema(close, slow_period)
+fast_line = ta.ema(close, fast_period)
+slow_line = ta.ema(close, slow_period)
 momentum = close - close[momentum_period]
 
 // 多头信号
-is_bullish_signal = fast_ma > slow_ma and momentum > 0
-is_bullish_end = fast_ma < slow_ma or momentum <= 0
+is_bullish_signal = fast_line > slow_line and momentum > 0
+is_bullish_end = fast_line < slow_line or momentum <= 0
 
 // 空头信号
-is_bearish_signal = fast_ma < slow_ma and momentum < 0
-is_bearish_end = fast_ma > slow_ma or momentum >= 0
+is_bearish_signal = fast_line < slow_line and momentum < 0
+is_bearish_end = fast_line > slow_line or momentum >= 0
 // 多头开单（允许连续开单）
 if is_bullish_signal
     strategy.entry("Buy", strategy.long, comment='开多@' + str.tostring(close))
