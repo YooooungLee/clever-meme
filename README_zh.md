@@ -29,6 +29,10 @@ MACD被称为技术指标之王。详细介绍了关于MACD指标（Moving Avera
 ##### 1.1.3 KDJ
 关于KDJ指标（随机指标）的一切信息，详见 [KDJ](Quant-code/indicator/KDJ.md)。
 
+##### 1.1.4 ADX
+关于ADX指标（平均趋向指数）的一切信息，详见 [ADX](Quant-code/indicator/ADX.md)。
+
+
 ##### 1.2 量化交易的进阶指标
 由易到难，逐步介绍量化交易中常用的进阶指标。
 ##### 1.2.1 布林带
