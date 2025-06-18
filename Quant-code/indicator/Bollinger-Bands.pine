@@ -1,1 +1,8 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ChartPrime
+
 //@version=6
+study("Bollinger Bands", overlay=true)
+length = input(20, "Length")
+mult = input(2.0, "Multiplier")
+

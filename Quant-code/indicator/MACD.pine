@@ -34,3 +34,4 @@ MACD = DIF - DEM
 plot(DIF, color=color.white, title="DIF线", linewidth=2)
 plot(DEM, color=color.yellow, title="DEM线", linewidth=2)
 plot(MACD, color=MACD >= 0 ? color.red : color.green, style=plot.style_histogram, title="MACD柱状图", linewidth=2)
+
