@@ -1,0 +1,103 @@
+//@version=6
+strategy("订单流分析", shorttitle="订单流", overlay=false, 
+         default_qty_type=strategy.fixed, default_qty_value=1,
+         pyramiding=0, calc_on_every_tick=true)
+
+// ====== 输入参数 ======
+var_group = "策略参数"
+timeframeInput = input.string("AUTO", "时间周期调整", options=["AUTO", "1分钟", "5分钟", "15分钟", "30分钟", "1小时", "4小时", "日线"], group=var_group)
+
+// 根据时间周期自动调整参数
+var timeframeMap = array.from("1", "5", "15", "30", "60", "240", "D")
+var selectedTimeframe = timeframeInput == "AUTO" ? timeframe.period : array.get(timeframeMap, array.indexof(array.from("1分钟", "5分钟", "15分钟", "30分钟", "1小时", "4小时", "日线"), timeframeInput))
+
+// 动态调整参数
+volumeThreshold = input.float(2.0, "成交量阈值(相对于平均值)", minval=1.0, group=var_group)
+priceChangeThreshold = input.float(0.5, "价格变化阈值(%)", minval=0.1, group=var_group)
+lookbackPeriod = input.int(20, "回溯期间", minval=5, group=var_group)
+
+// 根据时间周期调整参数
+adjustedVolumeThreshold = timeframeInput == "AUTO" ? volumeThreshold :timeframe.isintraday ? volumeThreshold * 1.5 : volumeThreshold
+adjustedPriceThreshold = timeframeInput == "AUTO" ? priceChangeThreshold :timeframe.isintraday ? priceChangeThreshold * 0.5 : priceChangeThreshold
+adjustedLookback = timeframeInput == "AUTO" ? lookbackPeriod :timeframe.isintraday ? math.floor(lookbackPeriod * 0.7) : lookbackPeriod
+
+// ====== 风控参数 ======
+risk_group = "风控参数"
+useStopLoss = input.bool(true, "启用止损", group=risk_group)
+stopLossPercent = input.float(2.0, "止损百分比", minval=0.1, maxval=100.0, group=risk_group)
+useTakeProfit = input.bool(true, "启用止盈", group=risk_group)
+takeProfitPercent = input.float(3.0, "止盈百分比", minval=0.1, maxval=100.0, group=risk_group)
+
+// ====== 计算指标 ======
+// 计算VWAP作为参考
+vwap = ta.vwap(hlc3)
+
+// 计算相对成交量（使用指数移动平均以减少滞后）
+averageVolume = ta.ema(volume, adjustedLookback)
+volumeRatio = volume / averageVolume
+
+// 计算价格变化百分比（相对VWAP）
+priceChange = math.abs(close - vwap) / vwap * 100
+
+// 计算买卖压力（考虑VWAP）
+buyPressure = close > vwap ? volume : 0.0
+sellPressure = close < vwap ? volume : 0.0
+netPressure = ta.ema(buyPressure - sellPressure, adjustedLookback)
+
+// 计算成交量动量
+volumeMomentum = ta.mom(volume, 1)
+isVolumeIncreasing = volumeMomentum > 0
+
+// ====== 生成信号 ======
+// 判断成交量和价格变动
+isHighVolume = volumeRatio >= volumeThreshold
+isSignificantMove = priceChange >= priceChangeThreshold
+
+// 生成交易条件
+longCondition = isHighVolume and isSignificantMove and netPressure > 0 and close > vwap and isVolumeIncreasing
+shortCondition = isHighVolume and isSignificantMove and netPressure < 0 and close < vwap and isVolumeIncreasing
+
+// ====== 执行策略 ======
+if (longCondition)
+    strategy.entry("买入开仓", strategy.long)
+if (shortCondition)
+    strategy.entry("卖出开仓", strategy.short)
+
+// 设置止损止盈
+if (useStopLoss or useTakeProfit)
+    strategy.exit("多单平仓", from_entry="买入开仓", stop=useStopLoss ? close * (1 - stopLossPercent/100) : na, limit=useTakeProfit ? close * (1 + takeProfitPercent/100) : na)
+    strategy.exit("空单平仓", from_entry="卖出开仓", stop=useStopLoss ? close * (1 + stopLossPercent/100) : na, limit=useTakeProfit ? close * (1 - takeProfitPercent/100) : na)
+
+// ====== 绘制图表 ======
+// 计算买卖压力
+bullishPressure = netPressure > 0 ? netPressure : 0
+bearishPressure = netPressure < 0 ? math.abs(netPressure) : 0
+
+// 计算移动最大值作为标准化基准
+maxPressure = math.max(ta.highest(bullishPressure, 100), ta.highest(bearishPressure, 100))
+normBullishPressure = maxPressure != 0 ? (bullishPressure / maxPressure * 100) : 0
+normBearishPressure = maxPressure != 0 ? (bearishPressure / maxPressure * 100) : 0
+
+// 绘制买卖压力柱状图
+plot(normBullishPressure, "买压", color=color.new(color.green, 0), style=plot.style_columns)
+plot(-normBearishPressure, "卖压", color=color.new(color.red, 0), style=plot.style_columns)
+
+// 绘制中轴线
+hline(0, "中轴线", color=color.new(color.gray, 50))
+
+// 绘制成交量比率（放大5倍使其更容易观察）
+plot(volumeRatio * 5, "成交量比率", color=color.new(color.blue, 0), linewidth=2)
+hline(volumeThreshold * 5, "成交量阈值", color=color.new(color.gray, 0), linestyle=hline.style_dashed)
+
+// ====== 背景标记 ======
+bgcolor(longCondition ? color.new(color.green, 90) : shortCondition ? color.new(color.red, 90) : na)
+
+// ====== 盈亏标记 ======
+if (strategy.closedtrades > 0)
+    lastTradeIndex = strategy.closedtrades - 1
+    lastTradeProfit = strategy.closedtrades.profit(lastTradeIndex)
+    lastTradeBarIndex = strategy.closedtrades.exit_bar_index(lastTradeIndex)
+    if (bar_index == lastTradeBarIndex)
+        labelText = lastTradeProfit > 0 ? "盈利: " + str.tostring(lastTradeProfit, "#.##") : "亏损: " + str.tostring(lastTradeProfit, "#.##")
+        labelColor = lastTradeProfit > 0 ? color.green : color.red
+        label.new(x=bar_index, y=close, text=labelText, color=labelColor, style=label.style_label_down, size=size.small)

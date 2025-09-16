@@ -20,7 +20,7 @@ This file contains concise, actionable guidance to help an AI coding assistant q
 4. Patterns and examples to copy:
    - Parameter handling: use `input.int(...)` / `input.source(close, title="Source")` as shown in `MACD.pine`.
    - Plotting style: `plot(..., color=..., style=plot.style_histogram)` is used for histogram bars (see `MACD.pine`).
-   - Documentation link convention: inside `.md` files link the implementation using relative paths, e.g. `[MACD](MACD.pine)`.
+   - Documentation link convention: inside `.md` files link the implementation using relative paths, e.g. [MACD](Quant-code/indicator/MACD.md)
 
 5. Build / test / run guidance:
    - There is no automated build system. To test Pine scripts, copy the `.pine` file contents into TradingView’s Pine editor (https://www.tradingview.com/) and run on a chart.
