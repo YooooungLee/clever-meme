@@ -3,6 +3,7 @@ strategy("订单流分析", shorttitle="订单流", overlay=false,
          default_qty_type=strategy.fixed, default_qty_value=1,
          pyramiding=0, calc_on_every_tick=true)
 
+
 // ====== 输入参数 ======
 var_group = "策略参数"
 timeframeInput = input.string("AUTO", "时间周期调整", options=["AUTO", "1分钟", "5分钟", "15分钟", "30分钟", "1小时", "4小时", "日线"], group=var_group)
