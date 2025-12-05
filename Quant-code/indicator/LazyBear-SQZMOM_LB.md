@@ -1,5 +1,4 @@
-## Squeeze Momentum Indicator [author:LazyBear]
-
+## SQZMOM_LB（Squeeze Momentum Indicator,挤压动量指标）
 ## SQZMOM_LB指标简介
 
 Squeeze Momentum Indicator (SQZMOM_LB) 是由知名交易员LazyBear在2014年开发的一种技术指标，旨在帮助交易者识别市场的“挤压”状态以及潜在的价格动量变化。该指标结合了布林带和肯特纳通道的概念，通过分析价格波动性和动量来提供买卖信号。

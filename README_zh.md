@@ -34,7 +34,7 @@ MACD被称为技术指标之王。详细介绍了关于MACD指标（Moving Avera
 
 ##### 1.1.5 
 
-##### 1.2 量化交易的进阶指标
+#### 1.2 量化交易的进阶指标
 由易到难，逐步介绍量化交易中常用的进阶指标。
 ##### 1.2.1 布林带
 布林带的原理是通过计算价格的平均值和标准差来确定价格的波动范围，从而确定价格的高低。
@@ -43,6 +43,18 @@ MACD被称为技术指标之王。详细介绍了关于MACD指标（Moving Avera
 
 ##### 1.2.2 唐奇安通道
 
+#### 1.3 交易员创新指标
+
+##### 1.3.1 LazyBear-SQZMOM_LB指标
+SQZMOM_LB，全称为“Squeeze Momentum Indicator by LazyBear”，是由知名交易员LazyBear开发的一种技术指标。中文名称为“挤压动量指标”。
+
+该指标旨在帮助交易者识别市场中的“挤压”状态，即价格波动性较低的时期，通常预示着即将出现的价格突破。SQZMOM_LB通过结合布林带和Keltner通道来确定市场是否处于挤压状态。当布林带收窄并进入Keltner通道内时，表示市场处于挤压状态，交易者可以准备迎接潜在的价格突破。
+
+个人经验上来看，他在1小时级别k线上表现较好。详见 [LazyBear-SQZMOM_LB指标](Quant-code/indicator/LazyBear-SQZMOM_LB.md)。
+
+
+##### 1.3.2 LuxAlgo-SMC指标
+SMC指标，全称为“Smart Money Concepts Indicator by LuxAlgo”，是由TradingView用户LuxAlgo开发的一种技术指标。中文名称为“聪明钱概念指标”。
 
 ----------------------------------
 ### 2. 策略 strategy
@@ -69,6 +81,10 @@ MACD被称为技术指标之王。详细介绍了关于MACD指标（Moving Avera
 这是我接触到的一个有趣的策略，在加密货币市场中，震荡市下的剧烈波动，在短线操作里出现了插针的K线，可以尝试精准切入到最低点/最高点，并在波动回归正常水平时获利。
 
 具体的介绍可以参考[布欧量化-接针策略](Quant-code/strategy/布欧量化-接针策略.md)。
+
+##### 2.2.2 用于寻找市场反转点的RSI+SMC策略
+
+smart risk在油管上发布的一篇教学内容。[Best Reversal Trading Strategy SMC, Divergence](https://youtu.be/tJisIdFUbYc?si=M1WTuUTYMPUaVlea)
 
 #### 2.3 合约与网格交易
 合约网格是一种量化交易策略，用于自动买卖期货合约。合约网格机器人可在设置的价格区间内，根据预设的时间间隔，自动在市场上下单。
