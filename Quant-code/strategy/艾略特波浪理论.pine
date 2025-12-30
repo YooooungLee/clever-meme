@@ -1,0 +1,564 @@
+// This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) https://creativecommons.org/licenses/by-nc-sa/4.0/
+// © LuxAlgo
+
+//@version=5
+// 艾略特波浪理论指标 - 由LuxAlgo开发
+// 该指标识别图表上的艾略特波浪模式，包括驱动浪和调整浪
+// 使用多个ZigZag长度来检测不同时间尺度的波浪
+// 提供斐波那契回撤水平，并标注波浪序号
+indicator("Elliott Wave [LuxAlgo]", max_lines_count=500, max_labels_count=500, overlay=true, max_bars_back=5000)
+//------------------------------------------------------------------------------
+//Settings 设置
+//-----------------------------------------------------------------------------{
+// 高/低数据源选择
+i_hi  = input.string('high'        , title=        ''          , group='source [high - low]', inline='hl', options=['high', 'close', 'max open/close'])
+i_lo  = input.string('low'         , title=        ''          , group='source [high - low]', inline='hl', options=['low' , 'close', 'min open/close'])
+
+// 三个ZigZag指标设置（不同长度和颜色）
+s1    = input.bool  (true          , title=        ''          , group='ZigZag'             , inline= '1'                                             )
+len1  = input.int   ( 4            , title=        '  1 Length', group='ZigZag'             , inline= '1', minval =1                                  )
+col1  = input.color (color.red   , title=        ''          , group='ZigZag'             , inline= '1'                                             )
+s2    = input.bool  (true          , title=        ''          , group='ZigZag'             , inline= '2'                                             )
+len2  = input.int   ( 8            , title=        '  2 Length', group='ZigZag'             , inline= '2', minval =1                                  )
+col2  = input.color (color.blue  , title=        ''          , group='ZigZag'             , inline= '2'                                             )
+s3    = input.bool  (true          , title=        ''          , group='ZigZag'             , inline= '3'                                             )                                           
+len3  = input.int   (16            , title=        '  3 Length', group='ZigZag'             , inline= '3', minval =1                                  )
+col3  = input.color (color.white , title=        ''          , group='ZigZag'             , inline= '3'                                             )
+
+
+// 斐波那契回撤水平设置（用于波浪的测量和回调）
+i_500 = input.float (0.500         , title='           level 1', group='Fibonacci values'   ,              minval =0, maxval =1, step =0.01           )
+i_618 = input.float (0.618         , title='           level 2', group='Fibonacci values'   ,              minval =0, maxval =1, step =0.01           )
+i_764 = input.float (0.764         , title='           level 3', group='Fibonacci values'   ,              minval =0, maxval =1, step =0.01           )
+i_854 = input.float (0.854         , title='           level 4', group='Fibonacci values'   ,              minval =0, maxval =1, step =0.01           )
+
+// 是否显示ZigZag线（用于调试）
+shZZ  = input.bool  (false         , title=         ''         , group='show ZZ'            , inline='zz'                                             )
+
+//-----------------------------------------------------------------------------}
+//User Defined Types 用户自定义类型
+//-----------------------------------------------------------------------------{
+// ZigZag数据结构：存储转折点信息
+type ZZ 
+    int  [] d  // 方向：1表示高点，-1表示低点
+    int  [] x  // 条形索引（x坐标）
+    float[] y  // 价格（y坐标）
+    line [] l  // 绘制的线对象（可选）
+
+// 艾略特波浪数据结构：存储一个完整的波浪模式
+type Ewave
+    line   l1  // 波浪1线
+    line   l2  // 波浪2线
+    line   l3  // 波浪3线
+    line   l4  // 波浪4线
+    line   l5  // 波浪5线
+    label  b1  // 波浪1标签
+    label  b2  // 波浪2标签
+    label  b3  // 波浪3标签
+    label  b4  // 波浪4标签
+    label  b5  // 波浪5标签
+    //
+    bool   on   // 波浪是否有效（true表示有效）
+    bool   br   // 是否被破坏（暂未使用）
+    //
+    int    dir  // 方向：1看涨（向上驱动浪），-1看跌（向下驱动浪）
+    //
+    line   lA   // 调整浪A线
+    line   lB   // 调整浪B线
+    line   lC   // 调整浪C线
+    label  bA   // 调整浪A标签
+    label  bB   // 调整浪B标签
+    label  bC   // 调整浪C标签
+    //
+    bool next = false  // 是否可能出现新的波浪（1）起点
+    //
+    label  lb   // 可能的起点标记（小圆圈）
+    box    bx   // 调整浪的矩形框（用于显示和突破检测）
+
+// 斐波那契线数据结构：存储斐波那契回撤水平线
+type fibL
+    line wave1_0_500  // 50.0%回撤线
+    line wave1_0_618  // 61.8%回撤线
+    line wave1_0_764  // 76.4%回撤线
+    line wave1_0_854  // 85.4%回撤线
+    line wave1_pole_  // 基准垂直线（从波浪终点到85.4%水平）
+    linefill l_fill_  // 76.4%-85.4%之间的填充区域
+    bool     _break_  // 斐波那契水平是否被突破
+
+//-----------------------------------------------------------------------------}
+//Functions
+//-----------------------------------------------------------------------------{
+// 计算高/低数据源（根据用户选择）
+hi = i_hi == 'high' ? high : i_hi == 'close' ? close : math.max(open, close)
+lo = i_lo == 'low'  ? low  : i_hi == 'close' ? close : math.min(open, close)
+
+// 更新ZigZag数组并绘制线（如果显示ZigZag选项开启）
+in_out(aZZ, d, x1, y1, x2, y2, col) =>
+    aZZ.d.unshift(d), aZZ.x.unshift(x2), aZZ.y.unshift(y2), aZZ.d.pop(), aZZ.x.pop(), aZZ.y.pop()
+    if shZZ
+        aZZ.l.unshift(line.new(x1, y1, x2, y2, color= col)), aZZ.l.pop().delete()
+
+// 检查当前波浪的前四个点是否与给定波浪相同（用于检测重复波浪）
+method isSame(Ewave gEW, _1x, _2x, _3x, _4x) => 
+    t1 = _1x == gEW.l1.get_x1() 
+    t2 = _2x == gEW.l2.get_x1() 
+    t3 = _3x == gEW.l3.get_x1()  
+    t4 = _4x == gEW.l4.get_x1()
+    t1 and t2 and t3 and t4
+
+// 检查当前波浪的后三个点是否与给定波浪相同（用于检测调整浪重复）
+method isSame2(Ewave gEW, _1x, _2x, _3x) => 
+    t1 = _1x == gEW.l3.get_x2() 
+    t2 = _2x == gEW.l4.get_x2()  
+    t3 = _3x == gEW.l5.get_x2()
+    t1 and t2 and t3 
+
+// 将驱动浪线设置为虚线并隐藏标签（表示波浪失效）
+method dot(Ewave gEW) =>
+    gEW.l1.set_style(line.style_dotted)
+    gEW.l2.set_style(line.style_dotted)
+    gEW.l3.set_style(line.style_dotted)
+    gEW.l4.set_style(line.style_dotted)
+    gEW.l5.set_style(line.style_dotted)
+    gEW.b1.set_textcolor    (color(na))
+    gEW.b2.set_textcolor    (color(na))
+    gEW.b3.set_textcolor    (color(na))
+    gEW.b4.set_textcolor    (color(na))
+    gEW.b5.set_textcolor    (color(na))
+    gEW.on := false
+
+// 将调整浪线设置为虚线并隐藏标签（表示调整浪失效）
+method dash(Ewave gEW) =>
+    gEW.lA.set_style(line.style_dashed)
+    gEW.lB.set_style(line.style_dashed)
+    gEW.lC.set_style(line.style_dashed)
+    gEW.bA.set_textcolor    (color(na))
+    gEW.bB.set_textcolor    (color(na))
+    gEW.bC.set_textcolor    (color(na))
+    gEW.bx.set_bgcolor      (color(na))
+    gEW.bx.set_border_color (color(na))
+
+// 设置斐波那契线的样式和颜色（根据是否突破）
+method sol_dot(fibL nFibL, sol_dot, col) =>
+    style = 
+     sol_dot ==  'dot'  ? 
+      line.style_dotted : 
+     sol_dot ==  'sol'  ? 
+      line.style_solid  :
+      line.style_dashed
+    nFibL.wave1_0_500.set_style(style)
+    nFibL.wave1_0_618.set_style(style)
+    nFibL.wave1_0_764.set_style(style)
+    nFibL.wave1_0_854.set_style(style)
+    nFibL.l_fill_.set_color(col)
+
+// 设置斐波那契线的位置（根据波浪终点和回撤水平计算）
+method set(fibL nFibL, int x1, int x2, float max_500, float max_618, float max_764, float max_854, float y2) =>
+    nFibL.wave1_0_500.set_xy1(x1, max_500)
+    nFibL.wave1_0_500.set_xy2(x2, max_500)
+    nFibL.wave1_0_618.set_xy1(x1, max_618)
+    nFibL.wave1_0_618.set_xy2(x2, max_618)
+    nFibL.wave1_0_764.set_xy1(x1, max_764)
+    nFibL.wave1_0_764.set_xy2(x2, max_764)
+    nFibL.wave1_0_854.set_xy1(x1, max_854)
+    nFibL.wave1_0_854.set_xy2(x2, max_854)
+    nFibL.wave1_pole_.set_xy1(x1,     y2 )
+    nFibL.wave1_pole_.set_xy2(x1, max_854)
+    nFibL.l_fill_.get_line1().set_xy1(x1, max_764)
+    nFibL.l_fill_.get_line1().set_xy2(x2, max_764)
+    nFibL.l_fill_.get_line2().set_xy1(x1, max_854)
+    nFibL.l_fill_.get_line2().set_xy2(x2, max_854)
+
+// 将斐波那契线设置为不可见（当波浪无效或调整浪已发展时）
+method setNa(fibL nFibL) =>
+    nFibL.wave1_0_500.set_xy1(na, na)
+    nFibL.wave1_0_500.set_xy2(na, na)
+    nFibL.wave1_0_618.set_xy1(na, na)
+    nFibL.wave1_0_618.set_xy2(na, na)
+    nFibL.wave1_0_764.set_xy1(na, na)
+    nFibL.wave1_0_764.set_xy2(na, na)
+    nFibL.wave1_0_854.set_xy1(na, na)
+    nFibL.wave1_0_854.set_xy2(na, na)
+    nFibL.wave1_pole_.set_xy1(na, na)
+    nFibL.wave1_pole_.set_xy2(na, na)
+    nFibL.l_fill_.set_color(color(na))
+
+// 主绘图函数：检测和绘制艾略特波浪模式
+// 参数：
+//   enabled: 是否启用此ZigZag长度的波浪检测
+//   left: ZigZag的左右偏移长度
+//   col: 线条颜色
+//   n: 用于标签定位的偏移（0,1,2对应三个ZigZag长度）
+draw(enabled, left, col, n) =>
+    //
+    max_bars_back(time, 2000)
+    // 声明变量：方向、转折点坐标、当前波浪对象
+    var int dir = na, var int x1= na, var float y1 = na, var int x2 = na, var float y2 = na, var Ewave gEW = na
+    // 记录最近一个驱动浪的起点和终点坐标（用于调整浪检测）
+    var int last_0x = na    ,  var float last_0y = na    ,   var int last_6x = na   ,    var float last_6y = na
+    //
+    if enabled
+        var fibL nFibL = fibL.new(
+           wave1_0_500 = line.new(na, na, na, na, color= color.new(col, 50), style= line.style_solid ),
+           wave1_0_618 = line.new(na, na, na, na, color= color.new(col, 38), style= line.style_solid ),
+           wave1_0_764 = line.new(na, na, na, na, color= color.new(col, 24), style= line.style_solid ),
+           wave1_0_854 = line.new(na, na, na, na, color= color.new(col, 15), style= line.style_solid ),
+           wave1_pole_ = line.new(na, na, na, na, color= color.new(col, 50), style= line.style_dashed),
+               l_fill_ = linefill.new(
+                         line.new(na, na, na, na, color= color(na))
+                       , line.new(na, na, na, na, color= color(na))
+                       ,                          color= color(na))
+                       ,                         _break_   =   na
+               )
+        //
+        var  ZZ        aZZ   =   ZZ.new(array.new < int   > ()
+                                      , array.new < int   > ()
+                                      , array.new < float > ()
+                                      , array.new < line  > () )
+        var Ewave[]    aEW   =          array.new < Ewave > ()
+        //
+        // 初始化：如果是第一个K线，初始化波浪数组和ZigZag数组
+        if barstate.isfirst
+            aEW.unshift(Ewave.new())
+            for i = 0 to 10
+                aZZ.d.unshift(0)
+                aZZ.x.unshift(0)
+                aZZ.y.unshift(0)
+                aZZ.l.unshift(shZZ ? line.new(na, na, na, na) : na)
+        //
+        sz       = aZZ.d.size( )          // ZigZag数组大小
+        x2      := bar_index -1           // 当前K线索引（上一个K线）
+        ph       = ta.pivothigh(hi, left, 1)  // 检测Pivot High（高点转折）
+        pl       = ta.pivotlow (lo, left, 1)  // 检测Pivot Low（低点转折）
+        t        = n == 2 ? '\n\n' : n == 1 ? '\n' : ''  // 标签换行偏移（用于避免标签重叠）
+        //
+        // ---------- 发现新的Pivot High（潜在看涨驱动浪） ----------
+        if not na(ph) 
+            gEW := aEW.get   (0)          // 获取当前活跃的波浪
+            dir := aZZ.d.get (0)          // 前一个ZigZag点的方向
+            x1  := aZZ.x.get (0)          // 前一个点的x坐标
+            y1  := aZZ.y.get (0)          // 前一个点的y坐标（价格）
+            y2  :=      nz(hi[1])         // 当前Pivot High的价格（前一根K线的高点）
+            //
+            // 更新ZigZag数组：如果前一个点是低点（dir < 1），则添加新高点并改变方向为1（向上）
+            if dir <  1  
+                in_out(aZZ,  1, x1, y1, x2, y2, col)
+            else
+                // 如果前一个点已经是高点，且当前高点更高，则更新该高点（延长）
+                if dir ==  1 and ph > y1 
+                    aZZ.x.set(0, x2), aZZ.y.set(0, y2)
+                    if shZZ
+                        aZZ.l.get(0).set_xy2(x2, y2)
+            //
+            // 提取最近6个ZigZag转折点的坐标（用于波浪识别）
+            _6x = x2, _6y = y2            // 最新转折点（当前高点）
+            _5x = aZZ.x.get(1), _5y = aZZ.y.get(1)  // 前一个转折点
+            _4x = aZZ.x.get(2), _4y = aZZ.y.get(2)  // 再前一个
+            _3x = aZZ.x.get(3), _3y = aZZ.y.get(3)
+            _2x = aZZ.x.get(4), _2y = aZZ.y.get(4)
+            _1x = aZZ.x.get(5), _1y = aZZ.y.get(5)
+            //
+            // –––––––––––––––––––––[ 驱动浪12345识别（看涨） ]–––––––––––––––––––––
+            // 计算各子浪的高度：浪1（_W1）、浪3（_W3）、浪5（_W5）
+            _W5 = _6y - _5y  // 浪5高度
+            _W3 = _4y - _3y  // 浪3高度
+            _W1 = _2y - _1y  // 浪1高度
+            min = math.min(_W1, _W3, _W5)  // 找出最小高度
+            // 艾略特波浪规则：浪3不能是最短的一浪，且价格必须满足递增关系
+            isWave = 
+             _W3 != min and                // 浪3不是最短的
+             _6y  > _4y and                // 浪5终点高于浪3终点
+             _3y  > _1y and                // 浪3终点高于浪1终点
+             _5y  > _2y                    // 浪4终点高于浪2终点
+            // 
+            same = gEW.isSame(_1x, _2x, _3x, _4x)
+            if isWave
+                if same
+                    gEW.l5.set_xy2(_6x, _6y)
+                    gEW.b5.set_xy (_6x, _6y)
+                else
+                    tx = ''
+                    if _2x == aEW.get(0).b5.get_x() 
+                        tx := '(5) (1)' 
+                        aEW.get(0).b5.set_text('')
+                    else
+                        tx := '(1)'
+                    //                
+                    wave = Ewave.new(
+                     l1  = line.new (_1x, _1y, _2x, _2y                      , color=col       , style= line.style_solid     ),
+                     l2  = line.new (_2x, _2y, _3x, _3y                      , color=col       , style= line.style_solid     ),
+                     l3  = line.new (_3x, _3y, _4x, _4y                      , color=col       , style= line.style_solid     ),
+                     l4  = line.new (_4x, _4y, _5x, _5y                      , color=col       , style= line.style_solid     ),
+                     l5  = line.new (_5x, _5y, _6x, _6y                      , color=col       , style= line.style_solid     ),
+                     b1  = label.new(_2x, _2y, text= tx    + t, textcolor=col, color= color(na), style=label.style_label_down),
+                     b2  = label.new(_3x, _3y, text= t + '(2)', textcolor=col, color= color(na), style=label.style_label_up  ),
+                     b3  = label.new(_4x, _4y, text= '(3)' + t, textcolor=col, color= color(na), style=label.style_label_down),
+                     b4  = label.new(_5x, _5y, text= t + '(4)', textcolor=col, color= color(na), style=label.style_label_up  ),
+                     b5  = label.new(_6x, _6y, text= '(5)' + t, textcolor=col, color= color(na), style=label.style_label_down),
+                     on  = true                                                                                               ,
+                     br  = false                                                                                              ,
+                     dir = 1
+                      )
+                    aEW.unshift(wave)
+                    nFibL._break_ := false   
+                    alert('New EW Motive Bullish Pattern found'  , alert.freq_once_per_bar_close)                                                                                       
+            //
+            if not isWave
+                if same and gEW.on == true
+                    gEW.dot() 
+                    alert('Invalidated EW Motive Bullish Pattern', alert.freq_once_per_bar_close)                                                                                       
+            //
+            // –––––––––––––––––––––[ ABC ]–––––––––––––––––––––
+            getEW    = aEW.get(0)
+            last_0x := getEW.l1.get_x1(), last_0y := getEW.l1.get_y1()
+            last_6x := getEW.l5.get_x2(), last_6y := getEW.l5.get_y2()
+            diff     = math.abs(last_6y - last_0y)
+            //
+            if getEW.dir == -1 
+                getX    = getEW.l5.get_x2()                
+                getY    = getEW.l5.get_y2() 
+                isSame2 = getEW.isSame2  (_1x, _2x, _3x)
+                isValid =
+                   _3x == getX                  and 
+                   _6y  < getY + (diff * i_854) and
+                   _4y  < getY + (diff * i_854) and
+                   _5y  > getY
+                //
+                if isValid
+                    width = _6x - _2x // –––[ width (4) - (c) ]–––
+                    if isSame2 and getEW.bA.get_x() > _3x
+                        getEW.lC.set_xy1(_5x, _5y), getEW.lC.set_xy2(_6x, _6y), getEW.bC.set_xy(_6x, _6y), getEW.bx.set_lefttop(_6x, _6y), getEW.bx.set_right(_6x + width)
+                    else
+                        getEW.lA := line.new (_3x, _3y, _4x, _4y, color=col), getEW.bA := label.new(_4x, _4y, text= '(a)' + t, textcolor=col, color= color(na), style=label.style_label_down)
+                        getEW.lB := line.new (_4x, _4y, _5x, _5y, color=col), getEW.bB := label.new(_5x, _5y, text= t + '(b)', textcolor=col, color= color(na), style=label.style_label_up  )
+                        getEW.lC := line.new (_5x, _5y, _6x, _6y, color=col), getEW.bC := label.new(_6x, _6y, text= '(c)' + t, textcolor=col, color= color(na), style=label.style_label_down)
+                        getEW.bx := box.new  (_6x, _6y, _6x + width, _4y, bgcolor=color.new(col, 93), border_color=color.new(col, 65))
+                        alert('New EW Corrective Bullish Pattern found'  , alert.freq_once_per_bar_close)                                                                                       
+                else
+                    if isSame2 and getEW.bA.get_x() > _3x
+                        getEW.dash()
+                        alert('Invalidated EW Corrective Bullish Pattern', alert.freq_once_per_bar_close)                                                                                       
+            //
+            // –––––––––––––––––––––[ new (1) ? ]–––––––––––––––––––––
+            if getEW.dir ==  1 
+                if _5x == getEW.bC.get_x() and 
+                   _6y >  getEW.b5.get_y() and
+                   getEW.next  == false
+                    getEW.next := true
+                    getEW.lb   := label.new(_6x, _6y, style=label.style_circle, color=color.new(col, 65), yloc=yloc.abovebar, size=size.tiny)
+                    alert('Possible new start of EW Motive Bullish Wave', alert.freq_once_per_bar_close)                                                                                       
+        //
+        // ---------- 发现新的Pivot Low（潜在看跌驱动浪） ----------
+        if not na(pl) 
+            gEW := aEW.get   (0)          // 获取当前活跃的波浪
+            dir := aZZ.d.get (0)          // 前一个ZigZag点的方向
+            x1  := aZZ.x.get (0)          // 前一个点的x坐标
+            y1  := aZZ.y.get (0)          // 前一个点的y坐标（价格）
+            y2  :=      nz(lo[1])         // 当前Pivot Low的价格（前一根K线的低点）
+            //
+            // 更新ZigZag数组：如果前一个点是高点（dir > -1），则添加新低点并改变方向为-1（向下）
+            if dir > -1  
+                in_out(aZZ, -1, x1, y1, x2, y2, col)
+            else
+                // 如果前一个点已经是低点，且当前低点更低，则更新该低点（延长）
+                if dir == -1 and pl < y1 
+                    aZZ.x.set(0, x2), aZZ.y.set(0, y2)
+                    if shZZ
+                        aZZ.l.get(0).set_xy2(x2, y2)
+            //
+            // 提取最近6个ZigZag转折点的坐标（用于波浪识别）
+            _6x = x2, _6y = y2            // 最新转折点（当前低点）
+            _5x = aZZ.x.get(1), _5y = aZZ.y.get(1)  // 前一个转折点
+            _4x = aZZ.x.get(2), _4y = aZZ.y.get(2)  // 再前一个
+            _3x = aZZ.x.get(3), _3y = aZZ.y.get(3)
+            _2x = aZZ.x.get(4), _2y = aZZ.y.get(4)
+            _1x = aZZ.x.get(5), _1y = aZZ.y.get(5)
+            //
+            // –––––––––––––––––––––[ 驱动浪12345识别（看跌） ]–––––––––––––––––––––
+            // 计算各子浪的高度：浪1（_W1）、浪3（_W3）、浪5（_W5）——注意看跌时高度为负值
+            _W5 = _5y - _6y  // 浪5高度（注意：看跌时浪5为负值，因为价格下降）
+            _W3 = _3y - _4y  // 浪3高度
+            _W1 = _1y - _2y  // 浪1高度
+            min = math.min(_W1, _W3, _W5)  // 找出最小高度（最负的值）
+            // 艾略特波浪规则：浪3不能是最短的一浪，且价格必须满足递减关系
+            isWave = 
+             _W3 != min and                // 浪3不是最短的
+             _4y  > _6y and                // 浪3终点低于浪5终点（注意：看跌时价格下降，所以浪3终点高于浪5终点？这里逻辑需要仔细看：_4y是浪3起点，_6y是浪5终点，看跌时浪3起点高于浪5终点，所以_4y > _6y成立）
+             _1y  > _3y and                // 浪1终点低于浪3终点（浪1终点高于浪3终点？看跌时浪1终点应高于浪3终点，所以_1y > _3y成立）
+             _2y  > _5y                    // 浪2终点低于浪4终点（浪2终点高于浪4终点？看跌时浪2终点应高于浪4终点，所以_2y > _5y成立）
+            // 
+            same = isSame(gEW, _1x, _2x, _3x, _4x)
+            if isWave
+                if same
+                    gEW.l5.set_xy2(_6x, _6y)
+                    gEW.b5.set_xy (_6x, _6y)
+                else
+                    tx = ''
+                    if _2x == aEW.get(0).b5.get_x() 
+                        tx := '(5) (1)' 
+                        aEW.get(0).b5.set_text('')
+                    else
+                        tx := '(1)'
+                    //
+                    wave = Ewave.new(
+                     l1  = line.new (_1x, _1y, _2x, _2y                      , color=col       , style= line.style_solid     ),
+                     l2  = line.new (_2x, _2y, _3x, _3y                      , color=col       , style= line.style_solid     ),
+                     l3  = line.new (_3x, _3y, _4x, _4y                      , color=col       , style= line.style_solid     ),
+                     l4  = line.new (_4x, _4y, _5x, _5y                      , color=col       , style= line.style_solid     ),
+                     l5  = line.new (_5x, _5y, _6x, _6y                      , color=col       , style= line.style_solid     ),
+                     b1  = label.new(_2x, _2y, text= t    + tx, textcolor=col, color= color(na), style=label.style_label_up  ),
+                     b2  = label.new(_3x, _3y, text= '(2)' + t, textcolor=col, color= color(na), style=label.style_label_down),
+                     b3  = label.new(_4x, _4y, text= t + '(3)', textcolor=col, color= color(na), style=label.style_label_up  ),
+                     b4  = label.new(_5x, _5y, text= '(4)' + t, textcolor=col, color= color(na), style=label.style_label_down),
+                     b5  = label.new(_6x, _6y, text= t + '(5)', textcolor=col, color= color(na), style=label.style_label_up  ),
+                     on  = true                                                                                               ,
+                     br  = false                                                                                              ,
+                     dir =-1
+                      )
+                    aEW.unshift(wave)
+                    nFibL._break_ := false 
+                    alert('New EW Motive Bearish Pattern found'  , alert.freq_once_per_bar_close)                                                                                                                                                            
+            //        
+            if not isWave
+                if same and gEW.on == true
+                    gEW.dot()   
+                    alert('Invalidated EW Motive Bearish Pattern', alert.freq_once_per_bar_close)                                                                                       
+            //
+            // –––––––––––––––––––––[ ABC ]–––––––––––––––––––––
+            getEW    = aEW.get(0)
+            last_0x := getEW.l1.get_x1(), last_0y := getEW.l1.get_y1()
+            last_6x := getEW.l5.get_x2(), last_6y := getEW.l5.get_y2()
+            diff     = math.abs(last_6y - last_0y)
+            //
+            if getEW.dir ==  1 
+                getX    = getEW.l5.get_x2()                
+                getY    = getEW.l5.get_y2() 
+                isSame2 = getEW.isSame2  (_1x, _2x, _3x)
+                isValid =
+                   _3x == getX                  and 
+                   _6y  > getY - (diff * i_854) and
+                   _4y  > getY - (diff * i_854) and
+                   _5y  < getY
+                //
+                if isValid
+                    width = _6x - _2x // –––[ width (4) - (c) ]–––
+                    if isSame2 and getEW.bA.get_x() > _3x
+                        getEW.lC.set_xy1(_5x, _5y), getEW.lC.set_xy2(_6x, _6y), getEW.bC.set_xy(_6x, _6y), getEW.bx.set_lefttop(_6x, _6y), getEW.bx.set_right(_6x + width)
+                    else
+                        getEW.lA := line.new (_3x, _3y, _4x, _4y, color=col), getEW.bA := label.new(_4x, _4y, text= t + '(a)', textcolor=col, color= color(na), style=label.style_label_up  )
+                        getEW.lB := line.new (_4x, _4y, _5x, _5y, color=col), getEW.bB := label.new(_5x, _5y, text= '(b)' + t, textcolor=col, color= color(na), style=label.style_label_down)
+                        getEW.lC := line.new (_5x, _5y, _6x, _6y, color=col), getEW.bC := label.new(_6x, _6y, text= t + '(c)', textcolor=col, color= color(na), style=label.style_label_up  )
+                        getEW.bx := box.new  (_6x, _6y, _6x + width, _4y, bgcolor=color.new(col, 93), border_color=color.new(col, 65))
+                        alert('New EW Corrective Bearish Pattern found'  , alert.freq_once_per_bar_close)                                                                                       
+                else
+                    if isSame2 and getEW.bA.get_x() > _3x
+                        getEW.dash() 
+                        alert('Invalidated EW Corrective Bullish Pattern', alert.freq_once_per_bar_close)                                                                                       
+            //
+            // –––[ check (only once) for a possible new (1) after an impulsive AND corrective wave ]–––
+            if getEW.dir == -1 
+                if _5x == getEW.bC.get_x() and 
+                   _6y <  getEW.b5.get_y() and
+                   getEW.next  == false
+                    getEW.next := true
+                    getEW.lb   := label.new(_6x, _6y, style=label.style_circle, color=color.new(col, 65), yloc=yloc.belowbar, size=size.tiny)
+                    alert('Possible new start of EW Motive Bearish Wave', alert.freq_once_per_bar_close)                                                                                       
+        //                    
+        // –––[ check for break box 检查调整浪矩形框的突破 ]–––
+        // 如果当前存在活跃的波浪（数组大小>0），检查价格是否突破了调整浪的矩形框
+        if aEW.size() > 0
+            gEW    := aEW.get(0)  // 获取最新的波浪对象
+            if gEW.dir == 1  // 如果是看涨驱动浪（方向向上）
+                // 看涨情况下：如果价格向下突破矩形框底部，且当前K线在矩形框右侧之前
+                if ta.crossunder(low , gEW.bx.get_bottom()) and bar_index <= gEW.bx.get_right()
+                    label.new(bar_index, low , yloc= yloc.belowbar, style= label.style_xcross, color=color.red, size=size.tiny)  // 在突破位置标记红色X
+            else  // 如果是看跌驱动浪（方向向下）
+                // 看跌情况下：如果价格向上突破矩形框顶部，且当前K线在矩形框右侧之前
+                if ta.crossover (high, gEW.bx.get_top   ()) and bar_index <= gEW.bx.get_right()
+                    label.new(bar_index, high, yloc= yloc.abovebar, style= label.style_xcross, color=color.red, size=size.tiny)  // 在突破位置标记红色X      
+        //
+        if barstate.islast  // 如果是最后一个K线（图表最右侧）
+            //  –––[ get last 2 EW's 获取最近的两个波浪对象 ]–––
+            getEW    = aEW.get(0)  // 最新的波浪
+            if aEW.size() > 1  // 如果存在至少两个波浪
+                getEW1   = aEW.get(1)  // 前一个波浪
+                last_0x := getEW.l1.get_x1(), last_0y := getEW.l1.get_y1()  // 驱动浪起点坐标
+                last_6x := getEW.l5.get_x2(), last_6y := getEW.l5.get_y2()  // 驱动浪终点坐标
+                //
+                diff = math.abs(last_6y - last_0y) // –––[ max/min difference 波浪的最大价格差（高度） ]–––
+                _500 = diff * i_500  // 50.0%斐波那契回撤水平对应的价格差
+                _618 = diff * i_618  // 61.8%斐波那契回撤水平对应的价格差
+                _764 = diff * i_764  // 76.4%斐波那契回撤水平对应的价格差
+                _854 = diff * i_854  // 85.4%斐波那契回撤水平对应的价格差
+                bull = getEW.dir == 1   // 判断是否为看涨波浪（方向向上）
+                // –––[ if EW is not valid or an ABC has developed -> remove fibonacci lines 如果波浪无效或已发展出调整浪ABC，则移除斐波那契线 ]–––
+                if getEW.on == false or getEW.bC.get_x() > getEW.b5.get_x()  // 波浪无效或调整浪C的标签在驱动浪5标签右侧（表示调整浪已形成）
+                    nFibL.setNa()  // 将斐波那契线设为不可见
+                else
+                // –––[ get.on == true ~ valid EW 波浪有效时计算并绘制斐波那契线 ]–––
+                    max_500 = last_6y + ((bull ? -1 : 1) * _500)  // 看涨时向下回撤（减），看跌时向上回撤（加）
+                    max_618 = last_6y + ((bull ? -1 : 1) * _618)
+                    max_764 = last_6y + ((bull ? -1 : 1) * _764)
+                    max_854 = last_6y + ((bull ? -1 : 1) * _854)
+                    //
+                    nFibL.set(last_6x, bar_index + 10, max_500, max_618, max_764, max_854, last_6y)  // 设置斐波那契线的位置
+                // –––[ if (2) label overlap with (C) label 如果浪2标签与调整浪C标签重叠时的处理 ]–––
+                if  getEW.b2.get_x() == getEW1.bC.get_x()  // 当前驱动浪的浪2标签与前一个波浪的调整浪C标签在同一位置
+                    getEW.b1.set_textcolor(color(na))  // 隐藏浪1标签
+                    getEW.b2.set_textcolor(color(na))  // 隐藏浪2标签
+                    strB  = getEW1.bB.get_text()       // 获取前一个波浪的调整浪B标签文本
+                    strC  = getEW1.bC.get_text()       // 获取前一个波浪的调整浪C标签文本
+                    strB_ = str.replace(strB, "(b)",  "(b) (1)", 0)  // 在(b)后添加"(1)"
+                    strC_ = str.replace(strC, "(c)",  "(c) (2)", 0)  // 在(c)后添加"(2)"
+                    getEW1.bB.set_text(strB_)          // 更新前一个波浪的调整浪B标签
+                    getEW1.bC.set_text(strC_)          // 更新前一个波浪的调整浪C标签
+            //        
+            // –––[ check if fib limits are broken ]–––
+            getP_854 = nFibL.wave1_0_854.get_y1()
+            for i = 0 to bar_index - nFibL.wave1_0_854.get_x1()
+                if getEW.dir == -1
+                    if high[i] > getP_854
+                        nFibL._break_ := true
+                        break
+                else
+                    if low [i] < getP_854
+                        nFibL._break_ := true
+                        break  
+            //––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+            switch nFibL._break_
+                true  => nFibL.sol_dot('dot', color.new(color.red , 95))
+                false => nFibL.sol_dot('sol', color.new(color.lime, 95))
+                => 
+                    nFibL.wave1_0_500.set_xy1(na, na)
+                    nFibL.wave1_0_500.set_xy2(na, na)
+                    nFibL.wave1_0_618.set_xy1(na, na)
+                    nFibL.wave1_0_618.set_xy2(na, na)
+                    nFibL.wave1_0_764.set_xy1(na, na)
+                    nFibL.wave1_0_764.set_xy2(na, na)
+                    nFibL.wave1_0_854.set_xy1(na, na)
+                    nFibL.wave1_0_854.set_xy2(na, na)
+                    nFibL.wave1_pole_.set_xy1(na, na)
+                    nFibL.wave1_pole_.set_xy2(na, na)
+                    nFibL.l_fill_.set_color(color(na))
+
+        if aEW.size() > 15 
+            pop = aEW.pop()
+            pop.l1.delete(), pop.b1.delete()
+            pop.l2.delete(), pop.b2.delete()
+            pop.l3.delete(), pop.b3.delete()
+            pop.l4.delete(), pop.b4.delete()
+            pop.l5.delete(), pop.b5.delete()
+            pop.lA.delete(), pop.bA.delete()
+            pop.lB.delete(), pop.bB.delete()
+            pop.lC.delete(), pop.bC.delete()
+            pop.lb.delete(), pop.bx.delete()
+        //----------------------------------
+
+//-----------------------------------------------------------------------------}
+//Plots
+//-----------------------------------------------------------------------------{
+draw(s1, len1, col1, 0)
+draw(s2, len2, col2, 1)
+draw(s3, len3, col3, 2)
+
+//-----------------------------------------------------------------------------}

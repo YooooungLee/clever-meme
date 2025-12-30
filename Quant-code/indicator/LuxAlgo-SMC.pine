@@ -79,8 +79,8 @@ MONOCHROME                      = 'Monochrome'  // 单色模式
 
 // 结构类型常量
 ALL                             = 'All'    // 显示所有类型
-BOS                             = 'BOS'    // 只显示结构突破
-CHOCH                           = 'CHoCH'  // 只显示性格改变
+BOS                             = 'BOS'    // 只显示结构突破【趋势延续信号】
+CHOCH                           = 'CHoCH'  // 只显示性格改变【趋势反转信号】
 
 // 标签大小常量
 TINY                            = size.tiny    // 极小
